@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TermLauncher</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0a;
+      color: #00ff88;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 15px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #header {
+      padding: 10px 16px 6px;
+      border-bottom: 1px solid #1a3a2a;
+      display: flex;
+      justify-content: space-between;
+    }
+    #header .title { color: #00ff88; font-weight: bold; letter-spacing: 2px; }
+    #header .clock { color: #007744; font-size: 13px; }
+    #output {
+      flex: 1;
+      padding: 14px 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .line           { white-space: pre-wrap; word-break: break-word; line-height: 1.7; }
+    .line.system    { color: #00ff88; }
+    .line.cmd       { color: #ffffff; }
+    .line.result    { color: #00cc66; }
+    .line.error     { color: #ff4444; }
+    .line.warn      { color: #ffaa00; }
+    .line.dim       { color: #2a4a3a; }
+    #input-row {
+      display: flex;
+      align-items: center;
+      padding: 10px 16px 16px;
+      border-top: 1px solid #1a3a2a;
+      gap: 6px;
+    }
+    #prompt { color: #00ff88; white-space: nowrap; user-select: none; }
+    #cmd-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #ffffff;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 15px;
+      caret-color: #00ff88;
+    }
+    #cmd-input::placeholder { color: #1a3a2a; }
+    #output::-webkit-scrollbar { width: 4px; }
+    #output::-webkit-scrollbar-thumb { background: #1a3a2a; border-radius: 2px; }
+  </style>
+</head>
+<body>
+<div id="header">
+  <span class="title">⬛ TERMLAUNCHER</span>
+  <span class="clock" id="clock"></span>
+</div>
+<div id="output"></div>
+<div id="input-row">
+  <span id="prompt">js&gt;&nbsp;</span>
+  <input id="cmd-input" type="text" autocomplete="off"
+         autocorrect="off" autocapitalize="off" spellcheck="false"
+         placeholder='App.open("appname")' />
+</div>
+<script>
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  const APPS = {
+    whatsapp  : { label: 'WhatsApp',    pkg: 'com.whatsapp' },
+    youtube   : { label: 'YouTube',     pkg: 'com.google.android.youtube' },
+    chrome    : { label: 'Chrome',      pkg: 'com.android.chrome' },
+    camera    : { label: 'Camera',      pkg: 'com.android.camera2' },
+    settings  : { label: 'Settings',    pkg: 'com.android.settings' },
+    termux    : { label: 'Termux',      pkg: 'com.termux' },
+    files     : { label: 'Files',       pkg: 'com.android.documentsui' },
+    maps      : { label: 'Google Maps', pkg: 'com.google.android.apps.maps' },
+    telegram  : { label: 'Telegram',    pkg: 'org.telegram.messenger' },
+    clock     : { label: 'Clock',       pkg: 'com.android.deskclock' },
+    calculator: { label: 'Calculator',  pkg: 'com.android.calculator2' },
+    gallery   : { label: 'Gallery',     pkg: 'com.android.gallery3d' },
+    spotify   : { label: 'Spotify',     pkg: 'com.spotify.music' },
+    twitter   : { label: 'Twitter/X',   pkg: 'com.twitter.android' },
+  };
+
+  const App = {
+    open(name) {
+      if (typeof name !== 'string') {
+        print('TypeError: App.open() expects a string.', 'error');
+        print('  Example: App.open("whatsapp")', 'warn');
+        return;
+      }
+      const key = name.toLowerCase().trim();
+      if (APPS[key]) {
+        launch(key);
+      } else {
+        print(`ReferenceError: "${name}" is not registered.`, 'error');
+        print('  Run App.list() to see all apps.', 'warn');
+      }
+    },
+    list() {
+      blank();
+      print('── Registered Apps ─────────────────────', 'warn');
+      Object.entries(APPS).forEach(([key, val]) => {
+        const pad = ' '.repeat(Math.max(1, 12 - key.length));
+        print(`  "${key}"${pad}→  ${val.label}`, 'result');
+      });
+      blank();
+      print('Usage: App.open("appname")', 'dim');
+      blank();
+    },
+    info(name) {
+      if (typeof name !== 'string') {
+        print('TypeError: App.info() expects a string.', 'error');
+        return;
+      }
+      const key = name.toLowerCase().trim();
+      if (!APPS[key]) {
+        print(`ReferenceError: "${name}" not found.`, 'error');
+        return;
+      }
+      blank();
+      print(`App.info("${key}") {`, 'result');
+      print(`  label   : "${APPS[key].label}",`, 'result');
+      print(`  package : "${APPS[key].pkg}"`, 'result');
+      print(`}`, 'result');
+      blank();
+    }
+  };
+
+  const Sys = {
+    clear() { document.getElementById('output').innerHTML = ''; },
+    time()  { print(new Date().toString(), 'result'); },
+    help()  {
+      blank();
+      print('── Available Commands ──────────────────', 'warn');
+      print('  App.open("name")    — launch an app', 'result');
+      print('  App.list()          — show all apps', 'result');
+      print('  App.info("name")    — app details', 'result');
+      print('  Sys.clear()         — clear screen', 'result');
+      print('  Sys.time()          — current time', 'result');
+      print('  Sys.help()          — this menu', 'result');
+      blank();
+      print('── Security ────────────────────────────', 'warn');
+      print('  JavaScript syntax required.', 'dim');
+      print('  Only App.* and Sys.* are permitted.', 'dim');
+      blank();
+    }
+  };
+
+  const output = document.getElementById('output');
+  function print(text, cls = 'system') {
+    const div = document.createElement('div');
+    div.className = 'line ' + cls;
+    div.textContent = text;
+    output.appendChild(div);
+    output.scrollTop = output.scrollHeight;
+  }
+  function blank() { print('', 'dim'); }
+
+  function launch(name) {
+    const app = APPS[name];
+    print(`▶ Launching ${app.label}...`, 'warn');
+    if (window.Android && window.Android.launch) {
+      window.Android.launch(app.pkg);
+    } else {
+      print(`[PREVIEW] package: ${app.pkg}`, 'dim');
+      print(`On device, ${app.label} would open now.`, 'result');
+    }
+  }
+
+  function safeEval(input) {
+    const clean = input.trim();
+    if (!clean) return;
+    const allowed = /^(App|Sys)\.[a-zA-Z]+\(.*\)$/;
+    if (!allowed.test(clean)) {
+      print('SyntaxError: Unrecognized command.', 'error');
+      print('  Only App.method() and Sys.method() allowed.', 'warn');
+      print('  Try: App.open("whatsapp")  or  Sys.help()', 'dim');
+      return;
+    }
+    try {
+      const fn = new Function('App', 'Sys', clean);
+      fn(App, Sys);
+    } catch (e) {
+      print(`${e.name}: ${e.message}`, 'error');
+    }
+  }
+
+  function boot() {
+    print('╔══════════════════════════════════════╗', 'dim');
+    print('║   TERMLAUNCHER  v1.0                 ║', 'system');
+    print('║   JavaScript Runtime  — sam@phone    ║', 'system');
+    print('╚══════════════════════════════════════╝', 'dim');
+    blank();
+    print('Initializing app registry... OK', 'result');
+    print(`${Object.keys(APPS).length} apps loaded.`, 'result');
+    blank();
+    print('Type  Sys.help()  to get started.', 'warn');
+    blank();
+  }
+  boot();
+
+  const cmdInput = document.getElementById('cmd-input');
+  const history = [];
+  let histIdx = -1;
+
+  cmdInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      const val = cmdInput.value;
+      print('js> ' + val, 'cmd');
+      safeEval(val);
+      if (val.trim()) { history.unshift(val); histIdx = -1; }
+      cmdInput.value = '';
+    } else if (e.key === 'ArrowUp') {
+      if (histIdx < history.length - 1) histIdx++;
+      cmdInput.value = history[histIdx] || '';
+      e.preventDefault();
+    } else if (e.key === 'ArrowDown') {
+      if (histIdx > 0) histIdx--;
+      else { histIdx = -1; cmdInput.value = ''; return; }
+      cmdInput.value = history[histIdx] || '';
+      e.preventDefault();
+    }
+  });
+
+  cmdInput.focus();
+  document.body.addEventListener('click', () => cmdInput.focus());
+</script>
+</body>
+</html>
